@@ -8,8 +8,9 @@
       <div class="container">
         <div class="filter-nav">
           <span class="sortby">Sort by:</span>
-          <a href="javascript:void(0)" class="default cur">Default</a>
-          <a href="javascript:void(0)" class="price">Price
+          <a href="javascript:void(0)" class="default" :class="{'cur':sortType==='default'}" @click="sortHandle('default')">Default</a>
+          <a href="javascript:void(0)" :class="{'sort-up':sortFlag,'sort-down':!sortFlag,'cur':sortType==='price'}" class="price"
+             @click="sortHandle('price')">Price
             <svg class="icon icon-arrow-short">
               <use xlink:href="#icon-arrow-short"></use>
             </svg>
@@ -35,18 +36,24 @@
               <ul>
                 <li v-for="(good,goodIndex) in goodsList">
                   <div class="pic">
-                    <a href="#">
-                      <img v-lazy="'/static/'+good.prodcutImg" alt="">
+                    <a href="javascript:;">
+                      <img v-lazy="'/static/'+good.productImage" alt="">
                     </a>
                   </div>
                   <div class="main">
                     <div class="name">{{good.productName}}</div>
-                    <div class="price">{{good.productPrice}}</div>
+                    <div class="price">{{good.salePrice}}</div>
                     <div class="btn-area">
-                      <a href="javascript:;" class="btn btn--m">加入购物车</a>
+                      <a href="javascript:;" @click="addCart(good.productId)" class="btn btn--m">加入购物车</a>
                     </div>
                   </div>
                 </li>
+                <div style="clear: both;height: 100px;text-align: center;" v-infinite-scroll="loadMore"
+                     infinite-scroll-disabled="busy" infinite-scroll-distance="10">
+                  <img v-show="isLoading" style="height: 100%;vertical-align: middle;"
+                       src="./../../static/loading/loading-balls.svg"
+                       alt="">
+                </div>
               </ul>
             </div>
           </div>
@@ -59,23 +66,26 @@
 </template>
 <script>
 
-  import './../assets/css/base.css'
-  import './../assets/css/product.css'
 
   import NavHeader from '@/components/NavHeader'
   import NavFooter from '@/components/NavFooter'
   import NavBread from '@/components/NavBread'
 
-  import goodsData from './../../mock/goods.json'
+  import {Goods} from '@/api/index'
 
-  import axios from 'axios'
 
   export default {
     data() {
       return {
         priceActive: 'all',
         filterByShow: false,
+        sortType: 'default',
+        sortFlag: false,
+        page: 1,
+        pageSize: 8,
         goodsList: [],
+        busy: false,
+        isLoading: false,
         priceFilter: [
           {
             start: '0.00',
@@ -89,6 +99,10 @@
             start: '1000.00',
             end: '2000.00'
           },
+          {
+            start: '2000.00',
+            end: '8000.00'
+          },
         ]
       }
     },
@@ -101,6 +115,17 @@
       NavHeader, NavFooter, NavBread
     },
     methods: {
+      sortHandle(sort) {
+        this.sortType = sort;
+        this.page = 1;
+        if (sort === 'default') {
+
+        }
+        if (sort === 'price') {
+          this.sortFlag = !this.sortFlag;
+        }
+        this._getGoodsList();
+      },
       openPriceFilter() {
         this.filterByShow = true;
       },
@@ -108,11 +133,50 @@
         this.filterByShow = false;
       },
       setPriceActive(index) {
+        this.page = 1;
         this.priceActive = index;
         this.closePriceFilter();
+        this._getGoodsList();
       },
-      _getGoodsList() {
-        this.goodsList = goodsData.result;
+      loadMore() {
+        this.busy = true;
+        setTimeout(() => {
+          this.page++;
+          this._getGoodsList(true);
+        }, 1000)
+      },
+      _getGoodsList(flag) {
+        let that = this;
+        that.isLoading = true;
+        Goods.getList({
+          page: that.page,
+          pageSize: that.pageSize,
+          sort: that.sortFlag === true ? '1' : -1,
+          priceLevel: that.priceActive
+        }).then(function (success) {
+          if (flag) {
+            that.goodsList = that.goodsList.concat(success.result.data);
+            if (success.result.data.length < 8) {
+              that.busy = true;
+            } else {
+              that.busy = false;
+            }
+          } else {
+            that.goodsList = success.result.data;
+            that.busy = false;
+          }
+        }, error => {
+          console.log('err', error)
+        })
+      },
+      addCart(id) {
+        Goods.addCart({
+          productId: id
+        }).then((res) => {
+          console.log(res)
+        }, err => {
+          console.log(err)
+        })
       }
     }
   }
