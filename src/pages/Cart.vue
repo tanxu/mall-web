@@ -23,8 +23,9 @@
             <li v-for="item in cartList">
               <div class="cart-tab-1">
                 <div class="cart-item-check">
-                  <a href="javascipt:;" class="checkbox-btn item-check-btn" v-bind:class="{'check':item.checked}"
-                     @click="editCart('checked',item)">
+                  <a href="javascipt:;" class="checkbox-btn item-check-btn"
+                     v-bind:class="{'check':item.checked==='true'}"
+                     @click="editCart('check',item)">
                     <svg class="icon icon-ok">
                       <use xlink:href="#icon-ok"></use>
                     </svg>
@@ -38,25 +39,25 @@
                 </div>
               </div>
               <div class="cart-tab-2">
-                <div class="item-price">{{item.salePrice}}</div>
+                <div class="item-price">{{item.salePrice | currency('￥')}}</div>
               </div>
               <div class="cart-tab-3">
                 <div class="item-quantity">
                   <div class="select-self select-self-open">
                     <div class="select-self-area">
-                      <a class="input-sub">-</a>
+                      <a class="input-sub" @click="editCart('de',item)">-</a>
                       <span class="select-ipt">{{item.productNum}}</span>
-                      <a class="input-add">+</a>
+                      <a class="input-add" @click="editCart('in',item)">+</a>
                     </div>
                   </div>
                 </div>
               </div>
               <div class="cart-tab-4">
-                <div class="item-price-total">{{item.productNum * item.salePrice}}</div>
+                <div class="item-price-total">{{item.productNum * item.salePrice | currency('￥')}}</div>
               </div>
               <div class="cart-tab-5">
                 <div class="cart-item-opration">
-                  <a href="javascript:;" class="item-edit-btn">
+                  <a href="javascript:;" class="item-edit-btn" @click="delGood(item)">
                     <svg class="icon icon-del">
                       <use xlink:href="#icon-del"></use>
                     </svg>
@@ -71,8 +72,8 @@
         <div class="cart-foot-inner">
           <div class="cart-foot-l">
             <div class="item-all-check">
-              <a href="javascipt:;">
-                  <span class="checkbox-btn item-check-btn">
+              <a href="javascipt:;" @click="checkAllHandle()">
+                  <span class="checkbox-btn item-check-btn" :class="{'check':checkAllFlag}">
                       <svg class="icon icon-ok"><use xlink:href="#icon-ok"/></svg>
                   </span>
                 <span>Select all</span>
@@ -81,10 +82,10 @@
           </div>
           <div class="cart-foot-r">
             <div class="item-total">
-              Item total: <span class="total-price">500</span>
+              Item total: <span class="total-price">{{totalPrice | currency('￥')}}</span>
             </div>
             <div class="btn-wrap">
-              <a class="btn btn--red">Checkout</a>
+              <a class="btn btn--red" :class="{'btn--dis':cartListCheckLength===0}" @click="checkOut()">Checkout</a>
             </div>
           </div>
         </div>
@@ -97,20 +98,134 @@
   import NavHeader from '@/components/NavHeader'
   import NavFooter from '@/components/NavFooter'
   import NavBread from '@/components/NavBread'
-
+  import {MessageBox, Message} from 'element-ui';
   import {Users} from '@/api/index'
+  import {currency} from '@/utils/currency'
 
 
   export default {
     data() {
       return {
-        cartList: []
+        cartList: [],
       }
     },
     mounted() {
       this._getCartList();
     },
+    // 局部过滤器
+    filters: {
+      currency: currency
+    },
+    computed: {
+      totalPrice() {
+        let price = 0;
+        this.cartList.forEach(item => {
+          if (item.checked === 'true') {
+            price += (item.salePrice * item.productNum)
+          }
+        })
+        return price;
+      },
+      checkAllFlag() {
+        return this.cartListCheckLength === this.cartList.length
+      },
+      cartListCheckLength() {
+        let i = 0;
+        this.cartList.forEach(item => {
+          if (item.checked === 'true') {
+            i++
+          }
+        })
+        return i;
+      }
+    },
     methods: {
+
+      checkOut() {
+        if (this.cartListCheckLength === 0) {
+          Message({
+            message: '您还没有选择商品',
+            type: 'warning'
+          });
+          return;
+        }
+        this.$router.push({
+          path: '/address'
+        })
+      },
+
+      checkAllHandle() {
+        let flag = !this.checkAllFlag;
+        this.cartList.forEach((item) => {
+          item.checked = flag ? 'true' : 'false';
+        })
+
+        Users.editCheckAll({
+          checkAll: flag
+        }).then(success => {
+        })
+
+      },
+
+      editCart(flag, item) {
+        let that = this;
+        if (flag === 'in') {
+          // 加1
+          item.productNum++;
+          item.checked = 'true'
+        }
+        if (flag === 'de') {
+          // 减1
+          if (item.productNum >= 2) {
+            item.productNum--;
+            item.checked = 'true'
+          } else {
+            this.delGood(item);
+          }
+        }
+        if (flag === 'check') {
+          item.checked = item.checked === 'true' ? 'false' : 'true'
+        }
+
+        Users.editCart({
+          productId: item.productId,
+          productNum: item.productNum,
+          checked: item.checked
+        }).then(success => {
+          if (flag === 'de') {
+            // 减1
+            that.$store.commit('decrementCartCount', 1);
+          } else if (flag === 'in') {
+            // 加1
+            that.$store.commit('incrementCartCount', 1);
+          }
+        });
+
+      },
+
+      delGood(item) {
+        let that = this;
+        MessageBox.confirm('确认删除吗', '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(() => {
+          Users.cartDelOne({productId: item.productId}).then(success => {
+            Message({
+              type: 'success',
+              message: '删除成功!'
+            });
+            that.$store.commit('decrementCartCount', item.productNum)
+            that._getCartList();
+          })
+        }).catch(() => {
+          Message({
+            type: 'info',
+            message: '已取消删除'
+          });
+        });
+      },
+
       _getCartList() {
         let that = this;
         Users.cartList().then(success => {
@@ -126,7 +241,7 @@
   }
 </script>
 <style>
-  .input-sub,.input-add{
+  .input-sub, .input-add {
     min-width: 40px;
     height: 100%;
     border: 0;
@@ -137,13 +252,15 @@
     display: inline-block;
     background: #f0f0f0;
   }
-  .item-quantity .select-self-area{
-    background:none;
+
+  .item-quantity .select-self-area {
+    background: none;
     border: 1px solid #f0f0f0;
   }
-  .item-quantity .select-self-area .select-ipt{
+
+  .item-quantity .select-self-area .select-ipt {
     display: inline-block;
-    padding:0 3px;
+    padding: 0 3px;
     width: 30px;
     min-width: 30px;
     text-align: center;

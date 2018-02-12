@@ -8,8 +8,10 @@
       <div class="container">
         <div class="filter-nav">
           <span class="sortby">Sort by:</span>
-          <a href="javascript:void(0)" class="default" :class="{'cur':sortType==='default'}" @click="sortHandle('default')">Default</a>
-          <a href="javascript:void(0)" :class="{'sort-up':sortFlag,'sort-down':!sortFlag,'cur':sortType==='price'}" class="price"
+          <a href="javascript:void(0)" class="default" :class="{'cur':sortType==='default'}"
+             @click="sortHandle('default')">Default</a>
+          <a href="javascript:void(0)" :class="{'sort-up':sortFlag,'sort-down':!sortFlag,'cur':sortType==='price'}"
+             class="price"
              @click="sortHandle('price')">Price
             <svg class="icon icon-arrow-short">
               <use xlink:href="#icon-arrow-short"></use>
@@ -70,7 +72,7 @@
   import NavHeader from '@/components/NavHeader'
   import NavFooter from '@/components/NavFooter'
   import NavBread from '@/components/NavBread'
-
+  import {Button, Select} from 'element-ui'
   import {Goods} from '@/api/index'
 
 
@@ -112,7 +114,8 @@
       this._getGoodsList();
     },
     components: {
-      NavHeader, NavFooter, NavBread
+      NavHeader, NavFooter, NavBread,
+      'el-button': Button
     },
     methods: {
       sortHandle(sort) {
@@ -170,12 +173,14 @@
         })
       },
       addCart(id) {
+        let that = this;
         Goods.addCart({
           productId: id
         }).then((res) => {
-          console.log(res)
+          that.$store.commit('incrementCartCount', 1);
+          console.log('res', res)
         }, err => {
-          console.log(err)
+          console.log('err', err)
         })
       }
     }

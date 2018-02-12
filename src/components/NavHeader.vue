@@ -19,11 +19,11 @@
       <div class="navbar-right-container" style="display: flex;">
         <div class="navbar-menu-container">
           <!--<a href="/" class="navbar-link">我的账户</a>-->
-          <span class="navbar-link" v-if="isLogin" v-text="userName"></span>
+          <span class="navbar-link" v-if="isLogin" v-text="nickName"></span>
           <a href="javascript:void(0)" class="navbar-link" v-if="!isLogin" @click="showLoginModal()">Login</a>
           <a href="javascript:void(0)" class="navbar-link" v-if="isLogin" @click="logout()">Logout</a>
           <div class="navbar-cart-container">
-            <span class="navbar-cart-count"></span>
+            <span class="navbar-cart-count" v-if="cartCount && cartCount>0">{{cartCount}}</span>
             <a class="navbar-link navbar-cart-link" href="javascript:;" @click="toCart">
               <svg class="navbar-cart-logo">
                 <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#icon-cart"></use>
@@ -75,11 +75,19 @@
   export default {
     data() {
       return {
-        userName: '',
         userPwd: '',
+        userName: '',
         loginModalIsVisibility: false,
         errorTips: false,
         isLogin: false,
+      }
+    },
+    computed: {
+      nickName() {
+        return this.$store.state.userInfo.nickName;
+      },
+      cartCount() {
+        return this.$store.state.cartCount;
       }
     },
     created() {
@@ -89,23 +97,33 @@
     },
     components: {},
     methods: {
-      toCart(){
-        this.$router.push({
-          path:'/cart'
+
+      getCartCount() {
+        Users.getCartCount().then(success => {
+          this.$store.commit('initCartCount', success.result.count)
         })
       },
-      checkLogin(){
-        let that = this;
-        Users.check().then(success=>{
-          if(success.status==='0'){
-            that.userName = success.result.userName;
-            that.isLogin = true;
-            console.log(that.userName)
-          }
-        },error=>{
 
-        }).catch(e=>{
-          console.log('catch',e)
+
+      toCart() {
+        this.$router.push({
+          path: '/cart'
+        })
+      },
+      checkLogin() {
+        let that = this;
+        Users.check().then(success => {
+//            that.userName = success.result.userName;
+          that.$store.commit('updateUserInfo', {
+            nickName: success.result.userName
+          })
+          that.getCartCount();
+          that.isLogin = true;
+          console.log(that.userName)
+        }, error => {
+
+        }).catch(e => {
+          console.log('catch', e)
 
         })
       },
@@ -117,6 +135,8 @@
           if (success.status === '0') {
             // 登出成功
             that.isLogin = false;
+            that.$store.commit('updateUserInfo', {})
+            that.$store.commit('initCartCount', 0)
           }
         }, error => {
         }).catch(e => {
@@ -135,6 +155,10 @@
         }).then(success => {
           if (success.status === '0') {
             // 登录成功
+            that.getCartCount();
+            that.$store.commit('updateUserInfo', {
+              nickName: success.result.userName
+            })
             that.isLogin = true;
             that.loginModalIsVisibility = false;
           } else {
